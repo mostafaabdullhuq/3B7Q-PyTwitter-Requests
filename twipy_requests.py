@@ -19,53 +19,137 @@ import sys
 
 
 class Twitter:
+
+    # constructor function of the class
     def __init__(self):
         self.__user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.15 Safari/537.36 Edg/101.0.1210.10"
         self.__bearer_token = "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA"
         self.session = requests.Session()
         self.__guest_token = None
         self.__is_logged_in = False
+        self.__is_banned = False
+        self.__is_suspended = False
 
-    # get the value of the browser user agent
-    @property
-    def user_agent(self):
-        return self.__user_agent
-
-    # get the value of the bearer token
-    @property
-    def bearer_token(self):
-        return self.__bearer_token
-
-    # set a new value for the bearer token
-    def change_bearer_token(self, new_bearer: str):
-        self.__bearer_token = new_bearer
-
-    # set a new value for the browser user agent
-    def change_user_agent(self, new_agent: str):
-        self.__user_agent = new_agent
-        return "User agent changed successfully."
-
-    # get the value of the guest token
-    @property
-    def guest_token(self):
-        return self.__guest_token
-    
-    # set the value of the guest token
-    def change_guest_token(self, new_guest_token: str):
-
-        self.__guest_token = new_guest_token
 
     def login_required(self, func):
+        """decorator to ensure that is user is logged in before performing specific action
+
+        Args:
+            func (func): A function that performs an action that you want to ensure that user is logged in before doing it.
+        """
         def nested_function(*args, **kwargs):
             if self.__is_logged_in:
                 func(*args, **kwargs)
             else:
-                yield "Your Are Not Logged In."
+                yield "Your must be logged in to perform this action."
         return nested_function
 
+    @property
+    def user_agent(self):
+        """
+        Returns:
+            str: the current user agent of the session.
+        """
+        return self.__user_agent
 
-    # login to the account
+    @property
+    def bearer_token(self):
+        """
+
+        Returns:
+            str: the current bearer token of the session.
+        """
+        return self.__bearer_token
+
+    def change_bearer_token(self, new_bearer: str):
+        """changes the current bearer token of the session
+
+        Args:
+            new_bearer (str): the new value of the bearer token you want to use in the session
+        """
+        self.__bearer_token = new_bearer
+
+    def change_user_agent(self, new_agent: str):
+        """changes the current user agent of the session
+
+        Args:
+            new_agent (str): the new value of the user agent you want to use in the session
+        """
+        self.__user_agent = new_agent
+    
+    @login_required
+    @property
+    def is_account_banned(self):
+        """A property that determines the state of the logged in account whether it's banned or not. (User must be logged in to perform this action)
+
+        Returns:
+            bool: True if the user is banned, False if not.
+        """
+        return self.__is_banned
+    
+    @login_required
+    @property
+    def is_account_suspended(self):
+        """A property that determines the state of the logged in account whether it's suspended or not. (User must be logged in to perform this action)
+
+        Returns:
+            bool: True if the user is suspended, False if not.
+        """
+        return self.__is_suspended
+
+    @property
+    def is_logged_in(self):
+        """A property that determines if there's a user already logged in or not.
+
+        Returns:
+            bool: True if user is already logged in, False if not.
+        """
+        return self.__is_logged_in
+    
+    @property
+    def guest_token(self):
+        """
+        Returns:
+            str: The current guest token.
+        """
+        return self.__guest_token
+    
+    def change_guest_token(self, new_guest_token: str):
+        """Manually changes the current guest token with a new one.
+
+        Args:
+            new_guest_token (str): the new value of the guest token.
+        """
+        self.__guest_token = new_guest_token
+
+    def generate_guest_token(self):
+        """generates new guest_token and automatically assign it to the guest_token variable
+
+        Returns:
+            list: first element is the state of the request, second element is the details about the request response.
+        """
+        get_guest_token_headers = {'Host': 'twitter.com', 'Connection': 'keep-alive', 'sec-ch-ua': '"Google Chrome";v="93", " Not;A Brand";v="99", "Chromium";v="93"', 'sec-ch-ua-mobile': '?0', 'sec-ch-ua-platform': '"Windows"', 'DNT': '1', 'Upgrade-Insecure-Requests': '1', 'User-Agent': self.user_agent, 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9', 'Sec-Fetch-Site': 'none', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-User': '?1', 'Sec-Fetch-Dest': 'document', 'Accept-Encoding': 'gzip, deflate, br', 'Accept-Language': 'en-US,en;q=0.9'}
+        get_guest_token = requests.get(f"https://twitter.com/",headers=get_guest_token_headers)
+        if get_guest_token.status_code == 200 and 'decodeURIComponent("gt' in get_guest_token.text:
+            try:
+                guest_token = findall('decodeURIComponent\("gt=(\d*);',get_guest_token.text)[0]
+                self.change_guest_token(guest_token)
+                return [True, guest_token]
+            except:
+                return [False, get_guest_token]
+        else:
+            return [False, get_guest_token]
+
     def login(self, username: str, password: str, challenge_method: str, proxy:str = False):
+        """login to account to start performing actions
+        Args:
+            username (str): the username of the account.
+            password (str): the password of the account.
+            challenge_method (str): email or phone number used for verification method.
+            proxy (str): proxy used to login (Optional).
+        Returns:
+            list: first element is the state of the request, second element is the details about the request response.
+        """
         if proxy:
             self.session.proxies.update({
                 "https":f"http://{proxy}",
@@ -705,8 +789,7 @@ class Twitter:
                                                                                     "application/json",
                                                                                     "User-Agent":
                                                                                     self.user_agent,
-                                                                                    "x-guest-token":
-                                                                                   self.guest_token,
+                                                                                    "x-guest-token": self.guest_token,
                                                                                     "x-twitter-active-user":
                                                                                     "yes",
                                                                                     "sec-ch-ua-platform":
@@ -875,45 +958,31 @@ class Twitter:
         else:
             return [False, get_login]
 
+    def get_user_data(self, username: str):
+        """ returns the user data for a specific username.
+        Args:
+            username (str): the username for the account you want to get it's details.
 
+        Returns:
+            list: first element is the state of the response. true if the request done successfully and false if some error happened in the request. second element is the data of the user if the request done successfully. or the response of the error request if the request is failed. 
+        """
+        get_user_info_headers = {'Host': 'twitter.com', 'Connection': 'keep-alive', 'sec-ch-ua': '"Google Chrome";v="93", " Not;A Brand";v="99", "Chromium";v="93"', 'DNT': '1', 'x-twitter-client-language': 'en', 'x-csrf-token': '1', 'sec-ch-ua-mobile': '?0', 'authorization': f'Bearer {self.bearer_token}', 'content-type': 'application/json', 'User-Agent': self.user_agent, 'x-guest-token': self.guest_token, 'x-twitter-active-user': 'no', 'sec-ch-ua-platform': '"Windows"', 'Accept': '*/*', 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Mode': 'cors', 'Sec-Fetch-Dest': 'empty', 'Referer': f'https://twitter.com/{username}', 'Accept-Encoding': 'gzip, deflate, br', 'Accept-Language': 'en-US,en;q=0.9', 'Cookie': f'gt={self.guest_token}; ct0=1'}
+        get_user_info = self.session.get(f"https://twitter.com/i/api/graphql/B-dCk4ph5BZ0UReWK590tw/UserByScreenName?variables=%7B%22screen_name%22%3A%22{username}%22%2C%22withSafetyModeUserFields%22%3Atrue%2C%22withSuperFollowsUserFields%22%3Afalse%7D",headers=get_user_info_headers)
+        if '"data":{"user":' in get_user_info.text and get_user_info.status_code == 200 and 'legacy' in get_user_info.text:
+            return [True, get_user_info.json()]
+        elif 'Rate limit exceeded' in str(get_user_info.text):
+            return [False, "Rate limit exceeded, Please try again later."]
+        elif get_user_info.status_code == 200 and 'user' in get_user_info.text and ('User has been suspended' in str(get_user_info.text) or 'reason":"Suspended' in get_user_info.text):
+            return [False, "Username suspended."]
+        elif '''"message":"Not found''' in str(get_user_info.text) or get_user_info.text == '''{"data":{}}''':
+            return [False, "Username not found."]
+        else:
+            return [False, get_user_info]
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    def login_required(self, func):
-        wraps(func)
-        def nestedFunc(*args, **kwargs):
-            pass
-
-        return nestedFunc
-
-    
-    def get_user_info(user_name):
-        pass
-
-    # a property that ends the session
     @property
     def log_out(self):
+        """A property that ends the current logged in session.
+        """
         self.session.close()
 
 
