@@ -1,4 +1,4 @@
-__author = "Mostafa Abdullhuq (3B7Q)"
+__author__ = "Mostafa Abdullhuq (3B7Q)"
 
 from functools import wraps
 import requests
